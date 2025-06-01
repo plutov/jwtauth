@@ -1,7 +1,6 @@
 package jwtauth_test
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -15,8 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
 var (
@@ -44,7 +43,7 @@ DLxxa5/7QyH6y77nCRQyJ3x3UwF9rUD0RCsp4sNdX5kOQ9PUyHyOtCUCAwEAAQ==
 )
 
 func init() {
-	TokenAuthHS256 = jwtauth.New(jwa.HS256.String(), TokenSecret, nil, jwt.WithAcceptableSkew(30*time.Second))
+	TokenAuthHS256 = jwtauth.New(jwa.HS256().String(), TokenSecret, nil, jwt.WithAcceptableSkew(30*time.Second))
 }
 
 //
@@ -105,17 +104,17 @@ func TestSimpleRSA(t *testing.T) {
 
 	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
 	publicKeyBlock, _ := pem.Decode([]byte(PublicKeyRS256String))
 
 	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
-	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), privateKey, publicKey)
+	TokenAuthRS256 = jwtauth.New(jwa.RS256().String(), privateKey, publicKey)
 
 	claims := map[string]interface{}{
 		"key":  "val",
@@ -133,7 +132,7 @@ func TestSimpleRSA(t *testing.T) {
 		t.Fatalf("Failed to decode token string %s\n", err.Error())
 	}
 
-	tokenClaims, err := token.AsMap(context.Background())
+	tokenClaims, err := jwtauth.TokenClaimsAsMap(token)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -154,14 +153,14 @@ func TestSimpleRSAVerifyOnly(t *testing.T) {
 	publicKeyBlock, _ := pem.Decode([]byte(PublicKeyRS256String))
 	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
-	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), nil, publicKey)
+	TokenAuthRS256 = jwtauth.New(jwa.RS256().String(), nil, publicKey)
 
 	_, _, err = TokenAuthRS256.Encode(claims)
 	if err == nil {
-		t.Fatalf("Expecting error when encoding claims without signing key")
+		t.Fatal("Expecting error when encoding claims without signing key")
 	}
 
 	token, err := TokenAuthRS256.Decode(tokenString)
@@ -169,7 +168,7 @@ func TestSimpleRSAVerifyOnly(t *testing.T) {
 		t.Fatalf("Failed to decode token string %s\n", err.Error())
 	}
 
-	tokenClaims, err := token.AsMap(context.Background())
+	tokenClaims, err := jwtauth.TokenClaimsAsMap(token)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -230,42 +229,42 @@ func TestMore(t *testing.T) {
 
 	// sending unauthorized requests
 	if status, resp := testRequest(t, ts, "GET", "/admin", nil, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	h := http.Header{}
 	h.Set("Authorization", "BEARER "+newJwtToken([]byte("wrong"), map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 	h.Set("Authorization", "BEARER asdf")
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 	// wrong token secret and wrong alg
 	h.Set("Authorization", "BEARER "+newJwt512Token([]byte("wrong"), map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 	// correct token secret but wrong alg
 	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	h = newAuthHeader(map[string]interface{}{"exp": jwtauth.EpochNow() - 1000})
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is expired\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	// sending authorized requests
 	if status, resp := testRequest(t, ts, "GET", "/", nil, nil); status != 200 || resp != "welcome" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	h = newAuthHeader((map[string]interface{}{"user_id": 31337, "exp": jwtauth.ExpireIn(5 * time.Minute)}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 200 || resp != "protected, user:31337" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 }
 
@@ -325,7 +324,7 @@ func newJwtToken(secret []byte, claims ...map[string]interface{}) string {
 		}
 	}
 
-	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, secret))
+	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256(), secret))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -340,7 +339,7 @@ func newJwt512Token(secret []byte, claims ...map[string]interface{}) string {
 			token.Set(k, v)
 		}
 	}
-	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS512, secret))
+	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS512(), secret))
 	if err != nil {
 		log.Fatal(err)
 	}
