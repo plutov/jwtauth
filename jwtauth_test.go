@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/jwtauth/v5"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/go-chi/jwtauth/v5"
 )
 
 var (
@@ -326,7 +326,7 @@ func newJwtToken(secret []byte, claims ...map[string]interface{}) string {
 
 	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256(), secret))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("unable to sign a token: %v", err)
 	}
 	return string(tokenPayload)
 }

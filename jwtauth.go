@@ -41,6 +41,8 @@ func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions
 		validateOptions: validateOptions,
 	}
 
+	jwa.RegisterSignatureAlgorithm(ja.alg)
+
 	if ja.verifyKey != nil {
 		ja.verifier = jwt.WithKey(ja.alg, ja.verifyKey)
 	} else {
